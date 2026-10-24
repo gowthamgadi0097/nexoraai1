@@ -44,12 +44,9 @@ export default function FeaturePage({ params }) {
           </div>
         </div>
         <div className="rcol">
+          {cam && <LiveCamera slug={f.slug} label={cam.label} gesture={!!cam.gesture} />}
           <DemoPlayer slug={f.slug} title={f.title} />
-          {cam ? (
-            <LiveCamera slug={f.slug} label={cam.label} gesture={!!cam.gesture} />
-          ) : (
-            <p className="note">This feature runs on radio, GPS or vehicle data, so it does not use the camera.</p>
-          )}
+          {!cam && <p className="note">This feature runs on radio, GPS or vehicle data, so it does not use the camera.</p>}
         </div>
       </div>
 

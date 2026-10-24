@@ -76,6 +76,20 @@ function CarControl({ result }) {
   );
 }
 
+function beep() {
+  try {
+    const C = window.AudioContext || window.webkitAudioContext;
+    const a = new C(); a.resume?.();
+    const o = a.createOscillator(), g = a.createGain();
+    o.frequency.value = 880; g.gain.value = 0.15;
+    o.connect(g); g.connect(a.destination); o.start();
+    setTimeout(() => { o.stop(); a.close(); }, 400);
+  } catch {}
+}
+function speak(t) {
+  try { window.speechSynthesis.cancel(); window.speechSynthesis.speak(new SpeechSynthesisUtterance(t)); } catch {}
+}
+
 export default function LiveCamera({ slug, label, gesture }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -84,6 +98,8 @@ export default function LiveCamera({ slug, label, gesture }) {
   const [res, setRes] = useState(null);
   const [err, setErr] = useState("");
   const [halt, setHalt] = useState(false); // analysis stopped (camera stays on)
+  const [sound, setSound] = useState(false);
+  const lastAlert = useRef(0);
 
   const start = useCallback(async () => {
     setErr(""); setState("starting");
@@ -128,14 +144,26 @@ export default function LiveCamera({ slug, label, gesture }) {
     return () => clearInterval(id);
   }, [state, slug, gesture, halt]);
 
+  useEffect(() => {
+    if (!sound || gesture || !res || !res.level || res.level === "ok") return;
+    if (Date.now() - lastAlert.current < (res.level === "danger" ? 5000 : 10000)) return;
+    lastAlert.current = Date.now();
+    beep();
+    speak(`${res.headline}. ${res.action || ""}`);
+  }, [res]); // eslint-disable-line
+
   return (
     <div className="box cam">
       <h3>LIVE CAMERA · {label.toUpperCase()}</h3>
       <div className="camv">
         <video ref={videoRef} muted playsInline style={{ display: state === "live" ? "block" : "none" }} />
         {state !== "live" && <div className="camph">{state === "starting" ? "Starting camera…" : "Camera is off"}</div>}
+        {state === "live" && !gesture && res?.level && res.level !== "ok" && (
+          <div className={`abanner ${res.level}`}>⚠️ {res.headline}{res.action ? <small>{res.action}</small> : null}</div>
+        )}
         {state === "live" && !gesture && res?.level && <span className="lvl" style={{ background: LVL[res.level] || LVL.ok }}>{res.level.toUpperCase()}</span>}
       </div>
+      {!gesture && <button className="btn" onClick={() => { const v = !sound; setSound(v); if (v) { beep(); speak("Sound alerts on"); } }}>{sound ? "🔔 Sound alerts ON" : "🔕 Turn on sound alerts"}</button>}
       {(state === "denied" || state === "error") && <button className="btn pri" onClick={start}>Enable camera</button>}
       {state === "live" && halt && <button className="btn pri" onClick={() => { setHalt(false); setErr(""); }}>Retry analysis</button>}
       {err && <div className="err">{err}</div>}

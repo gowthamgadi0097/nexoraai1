@@ -164,3 +164,10 @@ a { color: inherit; text-decoration: none; }
 .glegend { display: grid; gap: 2px; font-size: .78rem; color: var(--muted); }
 .clog { list-style: none; margin-top: 10px; font-size: .84rem; color: #cbd5e1; }
 .clog li { padding: 4px 0; border-bottom: 1px dashed var(--line); }
+
+.abanner { position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 14px; font-weight: 800; color: #031018; display: grid; gap: 2px; }
+.abanner small { font-weight: 600; font-size: .85rem; }
+.abanner.warning { background: #fbbf24; }
+.abanner.danger { background: #f87171; animation: ablink 1s infinite; }
+@keyframes ablink { 50% { opacity: .65; } }
+.cam > .btn { margin: 0 8px 8px 0; }
