@@ -46,7 +46,23 @@ export async function POST(req) {
     }
     const data = await r.json();
     const text = data?.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || "";
-    return NextResponse.json(JSON.parse(text.replace(/```json|```/g, "").trim()));
+    const j = JSON.parse(text.replace(/```json|```/g, "").trim());
+    const o = (Array.isArray(j) ? j[0] : j) || {};
+    if (cfg.gesture) {
+      const ok = ["open_palm", "closed_fist", "thumbs_up", "thumbs_down", "pointing_up", "none"];
+      return NextResponse.json({
+        hand_visible: o.hand_visible === true,
+        gesture: ok.includes(o.gesture) ? o.gesture : "none",
+        confidence: Math.max(0, Math.min(1, Number(o.confidence) || 0)),
+      });
+    }
+    const det = Array.isArray(o.details) ? o.details : o.details ? [o.details] : [];
+    return NextResponse.json({
+      level: ["ok", "warning", "danger"].includes(o.level) ? o.level : "ok",
+      headline: String(o.headline || "Analysis complete"),
+      details: det.slice(0, 3).map(String),
+      action: String(o.action || ""),
+    });
   } catch (e) {
     console.error("vision error", e);
     return fail("Could not read the analysis result.", 502);
