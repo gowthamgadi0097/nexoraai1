@@ -83,6 +83,7 @@ export default function LiveCamera({ slug, label, gesture }) {
   const [state, setState] = useState("starting"); // starting | live | denied | error
   const [res, setRes] = useState(null);
   const [err, setErr] = useState("");
+  const [halt, setHalt] = useState(false); // analysis stopped (camera stays on)
 
   const start = useCallback(async () => {
     setErr(""); setState("starting");
@@ -105,7 +106,7 @@ export default function LiveCamera({ slug, label, gesture }) {
   }, [start]);
 
   useEffect(() => {
-    if (state !== "live") return;
+    if (state !== "live" || halt) return;
     const c = document.createElement("canvas");
     const tick = async () => {
       const v = videoRef.current;
@@ -117,7 +118,7 @@ export default function LiveCamera({ slug, label, gesture }) {
         const image = c.toDataURL("image/jpeg", 0.6).split(",")[1];
         const r = await fetch("/api/vision", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, image }) });
         const d = await r.json();
-        if (!r.ok) { setErr(d.error || "Analysis failed."); if (d.fatal) setState("error"); }
+        if (!r.ok) { setErr(d.error || "Analysis failed."); if (d.fatal) setHalt(true); }
         else { setErr(""); setRes({ ...d, t: Date.now() }); }
       } catch { setErr("Network error."); }
       busy.current = false;
@@ -125,7 +126,7 @@ export default function LiveCamera({ slug, label, gesture }) {
     tick();
     const id = setInterval(tick, gesture ? 1400 : 2500);
     return () => clearInterval(id);
-  }, [state, slug, gesture]);
+  }, [state, slug, gesture, halt]);
 
   return (
     <div className="box cam">
@@ -136,6 +137,7 @@ export default function LiveCamera({ slug, label, gesture }) {
         {state === "live" && !gesture && res?.level && <span className="lvl" style={{ background: LVL[res.level] || LVL.ok }}>{res.level.toUpperCase()}</span>}
       </div>
       {(state === "denied" || state === "error") && <button className="btn pri" onClick={start}>Enable camera</button>}
+      {state === "live" && halt && <button className="btn pri" onClick={() => { setHalt(false); setErr(""); }}>Retry analysis</button>}
       {err && <div className="err">{err}</div>}
       {res && !gesture && (
         <div className="cres">
