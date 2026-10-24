@@ -41,7 +41,8 @@ export default function GoogleButton({ onSuccess, onError }) {
   return (
     <>
       <div className="or"><span>or</span></div>
-      <div ref={box} className="gbtn">{!ready && <span className="gnote">Loading Google…</span>}</div>
+      <div ref={box} className="gbtn" />
+      {!ready && <p className="gnote">Loading Google…</p>}
     </>
   );
 }
