@@ -9,6 +9,7 @@
     "test:db": "node --env-file=.env.local scripts/test-db.mjs"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "^0.10.14",
     "bcryptjs": "^2.4.3",
     "google-auth-library": "^9.14.0",
     "jsonwebtoken": "^9.0.2",

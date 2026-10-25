@@ -3,8 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { FEATURES, bySlug } from "@/lib/features";
 import { getSession } from "@/lib/auth";
 import DemoPlayer from "@/components/DemoPlayer";
-import LiveCamera from "@/components/LiveCamera";
-import { CAMERA } from "@/lib/camera-features";
+import GestureCar from "@/components/GestureCar";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +15,6 @@ export function generateMetadata({ params }) {
 export default function FeaturePage({ params }) {
   const f = bySlug(params.slug);
   if (!f) notFound();
-  const cam = CAMERA[f.slug];
   const s = getSession();
   if (!s) redirect(`/login?next=/feature/${f.slug}`);
   const i = FEATURES.findIndex((x) => x.slug === f.slug);
@@ -44,9 +42,8 @@ export default function FeaturePage({ params }) {
           </div>
         </div>
         <div className="rcol">
-          {cam && <LiveCamera slug={f.slug} label={cam.label} gesture={!!cam.gesture} />}
+          {f.slug === "gesture-controlled-functions" && <GestureCar />}
           <DemoPlayer slug={f.slug} title={f.title} />
-          {!cam && <p className="note">This feature runs on radio, GPS or vehicle data, so it does not use the camera.</p>}
         </div>
       </div>
 
