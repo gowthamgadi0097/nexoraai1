@@ -12,11 +12,14 @@ const POS = { FL: [62, 80], FR: [178, 80], RL: [62, 150], RR: [178, 150] };
 const ALL0 = { FL: 0, FR: 0, RL: 0, RR: 0 };
 const GESTURES = [["✋", "Open palm", "Unlock + open front doors"], ["✊", "Fist", "Close + lock doors"], ["👍", "Thumbs up", "Windows down"], ["👎", "Thumbs down", "Windows up"], ["☝️", "Index up", "Stop / hold"]];
 
+const withTimeout = (p, ms, what) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(what)), ms))]);
+
 export default function GestureCar() {
   const videoRef = useRef(null), streamRef = useRef(null), recRef = useRef(null), rafRef = useRef(0);
   const hold = useRef({ g: null, since: 0 }), cool = useRef(0), lastT = useRef(0), lastKey = useRef(""), drivingRef = useRef(false);
   const applyRef = useRef(() => {});
   const [status, setStatus] = useState("loading"); // loading | live | denied | error
+  const [stage, setStage] = useState("perm"); // perm (waiting for camera) | model (camera on, loading AI) | ready
   const [msg, setMsg] = useState("");
   const [seen, setSeen] = useState({ g: "none", p: 0 });
   const [doors, setDoors] = useState(ALL0);
@@ -43,29 +46,36 @@ export default function GestureCar() {
   };
 
   const start = useCallback(async () => {
-    setStatus("loading"); setMsg("");
+    setStatus("loading"); setMsg(""); setStage("perm");
+    streamRef.current?.getTracks().forEach((t) => t.stop());
     try {
       if (!navigator.mediaDevices?.getUserMedia) throw Object.assign(new Error("no-api"), { name: "NoApi" });
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
       streamRef.current = stream;
       videoRef.current.srcObject = stream;
       await videoRef.current.play();
+      setStage("model");
     } catch (e) {
       setStatus(e?.name === "NotAllowedError" ? "denied" : "error");
-      setMsg(e?.name === "NotAllowedError" ? "Camera permission was blocked. Allow it from the icon in the address bar." : e?.name === "NotFoundError" ? "No camera found on this device." : "Camera needs HTTPS (or localhost) and a free camera.");
+      setMsg(e?.name === "NotAllowedError" ? "Camera permission was blocked. Allow it from the icon in the address bar, then press Retry." : e?.name === "NotFoundError" ? "No camera found on this device." : "Camera needs HTTPS (or localhost) and a free camera. Close other apps using it, then press Retry.");
       return;
     }
     try {
       if (!recRef.current) {
         const { FilesetResolver, GestureRecognizer } = await import("@mediapipe/tasks-vision");
-        const fs = await FilesetResolver.forVisionTasks(WASM);
-        const make = (delegate) => GestureRecognizer.createFromOptions(fs, { baseOptions: { modelAssetPath: MODEL, delegate }, runningMode: "VIDEO", numHands: 1 });
+        let fs;
+        try { fs = await withTimeout(FilesetResolver.forVisionTasks(WASM), 30000, "engine"); } catch { throw new Error("engine"); }
+        const make = (delegate) => withTimeout(GestureRecognizer.createFromOptions(fs, { baseOptions: { modelAssetPath: MODEL, delegate }, runningMode: "VIDEO", numHands: 1 }), 30000, "model");
         try { recRef.current = await make("GPU"); } catch { recRef.current = await make("CPU"); }
       }
-    } catch {
-      setStatus("error"); setMsg("Could not load the gesture AI model. Check your internet connection and try again.");
+    } catch (e) {
+      setStatus("error");
+      setMsg(e?.message === "engine"
+        ? "Could not load the AI engine from cdn.jsdelivr.net. Check your internet or firewall, then press Retry."
+        : "Could not load the AI model from storage.googleapis.com. Check your internet or firewall, then press Retry.");
       return;
     }
+    setStage("ready");
     setStatus("live");
     const loop = () => {
       rafRef.current = requestAnimationFrame(loop);
@@ -115,11 +125,12 @@ export default function GestureCar() {
     <div className="box cam">
       <h3>LIVE CAMERA · HAND GESTURES</h3>
       <div className="camv">
-        <video ref={videoRef} muted playsInline style={{ display: status === "live" ? "block" : "none" }} />
-        {status !== "live" && <div className="camph">{status === "loading" ? "Starting camera and loading the AI model…" : "Camera is off"}</div>}
+        <video ref={videoRef} muted playsInline />
+        {stage === "perm" && <div className="camph" style={{ background: "#060d1b", padding: 16, textAlign: "center" }}>{status === "loading" ? "Waiting for the camera. Click Allow in the browser popup (see the address bar)." : "Camera is off"}</div>}
+        {stage === "model" && status === "loading" && <div className="gtag">⏳ Camera is on. Loading the hand-detection AI (first time can take 10 to 30 seconds)…</div>}
         {status === "live" && <div className="gtag">{LABEL[seen.g] || "Show a hand gesture"}<i style={{ width: `${seen.p * 100}%` }} /></div>}
       </div>
-      {(status === "denied" || status === "error") && <button className="btn pri" onClick={start}>Enable camera</button>}
+      {(status === "denied" || status === "error") && <button className="btn pri" onClick={start}>Retry</button>}
       {msg && <div className="err">{msg}</div>}
 
       <div className="carbox">
